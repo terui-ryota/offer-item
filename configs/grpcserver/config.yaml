@@ -1,0 +1,15 @@
+grpc_port: 19001
+monitor_port: 8081
+logger:
+  level: debug
+  encoding: console
+database:
+  dbname: offer_item
+  host: localhost
+  port: 3306
+  user: root
+  password: bobbob1234
+  max_idle_conn: 10
+  max_open_conn: 10
+  max_idle_time: 5m
+  debug: true
