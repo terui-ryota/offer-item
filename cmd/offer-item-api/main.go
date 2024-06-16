@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/terui-ryota/offer-item/protofiles/proto"
+	pb "github.com/terui-ryota/protofiles/go/offer_item"
 
 	"google.golang.org/grpc"
 )
@@ -15,7 +15,7 @@ const (
 )
 
 type server struct {
-	pb.UnimplementedPrivateServer
+	pb.UnimplementedOfferItemHandlerServer
 }
 
 func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckReq) (*pb.HealthCheckRes, error) {
@@ -26,7 +26,12 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckReq) (*pb.H
 	}, nil
 }
 
-func (s *server) mustEmbedUnimplementedPrivateServer() {}
+func (s *server) SaveOfferItem(ctx context.Context, req *pb.SaveOfferItemRequest) (*pb.SaveOfferItemResponse, error) {
+	// TODO: SaveOfferItem の実装を追加
+	return &pb.SaveOfferItemResponse{}, nil
+}
+
+func (s *server) mustEmbedUnimplementedOfferItemHandlerServer() {}
 
 func main() {
 	lis, err := net.Listen("tcp", port)
@@ -35,7 +40,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterPrivateServer(s, &server{})
+	pb.RegisterOfferItemHandlerServer(s, &server{})
 	log.Printf("Server listening on port %s", port)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
