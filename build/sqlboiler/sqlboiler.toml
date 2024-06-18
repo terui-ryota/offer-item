@@ -1,0 +1,8 @@
+[mysql]
+  dbname = "offer_item"
+  host   = "127.0.0.1"
+  port   = 3306
+  user   = "root"
+  pass   = "bobbob1234"
+  sslmode= "false"
+  blacklist = ["migrations"]

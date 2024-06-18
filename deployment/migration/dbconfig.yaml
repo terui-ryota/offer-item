@@ -1,0 +1,5 @@
+local:
+  dialect: mysql
+  datasource: root:bobbob1234@tcp(localhost:3306)/offer_item?charset=utf8&parseTime=true&loc=Asia%2FTokyo
+  dir: offer_item
+  table: migrations
