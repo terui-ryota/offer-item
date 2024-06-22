@@ -8,18 +8,18 @@ import (
 	pb "github.com/terui-ryota/protofiles/go/offer_item"
 )
 
-type OfferItemHandler struct {
+type offerItemHandler struct {
 	offerItemUsecase usecase.OfferItemUsecase
 	pb.UnimplementedOfferItemHandlerServer
 }
 
-func NewOfferItemHandler(offerItemUsecase usecase.OfferItemUsecase) *OfferItemHandler {
-	return &OfferItemHandler{
+func NewOfferItemHandler(offerItemUsecase usecase.OfferItemUsecase) *offerItemHandler {
+	return &offerItemHandler{
 		offerItemUsecase: offerItemUsecase,
 	}
 }
 
-func (h *OfferItemHandler) HealthCheck(ctx context.Context, req *pb.HealthCheckReq) (*pb.HealthCheckRes, error) {
+func (h *offerItemHandler) HealthCheck(ctx context.Context, req *pb.HealthCheckReq) (*pb.HealthCheckRes, error) {
 	fmt.Print("============HealthCheck===============")
 	// TODO: HealthCheckの実装を追加
 	return &pb.HealthCheckRes{
@@ -28,7 +28,21 @@ func (h *OfferItemHandler) HealthCheck(ctx context.Context, req *pb.HealthCheckR
 	}, nil
 }
 
-func (h *OfferItemHandler) SaveOfferItem(ctx context.Context, req *pb.SaveOfferItemRequest) (*pb.SaveOfferItemResponse, error) {
-	// TODO: SaveOfferItemの実装を追加
-	return &pb.SaveOfferItemResponse{}, nil
+// オファー案件を作成する
+func (h *offerItemHandler) SaveOfferItem(ctx context.Context, req *pb.SaveOfferItemRequest) (*pb.SaveOfferItemResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// DTOに変換する
+	offerItemDTO := dto.SaveOfferItemPBToDTO(req.GetOfferItem())
+
+	// 作成する
+	if err := h.offerItemUsecase.SaveOfferItem(ctx, offerItemDTO); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.CreateOfferItem: %w", err)
+	}
+
+	return &offer_item.SaveOfferItemResponse{
+		Request: req,
+	}, nil
 }
