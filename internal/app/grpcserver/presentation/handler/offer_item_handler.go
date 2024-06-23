@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/terui-ryota/offer-item/internal/application/usecase"
+	"github.com/terui-ryota/offer-item/internal/domain/dto"
+	"github.com/terui-ryota/offer-item/pkg/apperr"
 	pb "github.com/terui-ryota/protofiles/go/offer_item"
 )
 
@@ -42,7 +44,7 @@ func (h *offerItemHandler) SaveOfferItem(ctx context.Context, req *pb.SaveOfferI
 		return nil, fmt.Errorf("h.offerItemUsecase.CreateOfferItem: %w", err)
 	}
 
-	return &offer_item.SaveOfferItemResponse{
+	return &pb.SaveOfferItemResponse{
 		Request: req,
 	}, nil
 }

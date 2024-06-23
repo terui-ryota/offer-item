@@ -3,11 +3,14 @@ package usecase
 import (
 	"context"
 	"database/sql"
+	"fmt"
+
+	"github.com/terui-ryota/offer-item/internal/domain/dto"
 )
 
 type OfferItemUsecase interface {
 	//SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error
-	SaveOfferItem(ctx context.Context) error
+	SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error
 }
 
 func NewOfferItemUsecase(
@@ -46,7 +49,9 @@ type offerItemUsecaseImpl struct {
 	//validationConfig                      *config.ValidationConfig
 }
 
-func (o *offerItemUsecaseImpl) SaveOfferItem(ctx context.Context) error {
+func (o *offerItemUsecaseImpl) SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error {
+
+	fmt.Println(offerItemDTO)
 	//ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.SaveOfferItem")
 	//defer span.End()
 

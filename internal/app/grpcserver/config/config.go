@@ -12,9 +12,9 @@ import (
 )
 
 type GRPCConfig struct {
-	GrpcPort    uint16      `yaml:"grpc_port"`
-	MonitorPort uint16      `yaml:"monitor_port"`
-	Logger      *zap.Config `yaml:"logger"`
+	GrpcPort uint16 `yaml:"grpc_port"`
+	//MonitorPort uint16      `yaml:"monitor_port"`
+	Logger *zap.Config `yaml:"logger"`
 	//Tracing     *tracing.Config      `yaml:"tracing"`
 	Database *commonConf.Database `yaml:"database"`
 	// Databases        *commonConf.Databases        `yaml:"database"` // TODO:

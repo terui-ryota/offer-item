@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/terui-ryota/offer-item/consts"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/ca-media-nantes/libgo/v2/consts"
 )
 
 var logger struct {

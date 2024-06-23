@@ -3,7 +3,7 @@ package apperr
 import (
 	"fmt"
 
-	commonpb "github.com/ca-media-nantes/pick/protofiles/go/common"
+	commonpb "github.com/terui-ryota/protofiles/go/common"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

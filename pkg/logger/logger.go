@@ -8,12 +8,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/terui-ryota/offer-item/util/random"
 	"go.opencensus.io/trace"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/ca-media-nantes/libgo/v2/util/random"
 )
 
 const (

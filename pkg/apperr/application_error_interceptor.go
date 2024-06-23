@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ca-media-nantes/libgo/v2/logger"
+	"github.com/terui-ryota/offer-item/pkg/logger"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
