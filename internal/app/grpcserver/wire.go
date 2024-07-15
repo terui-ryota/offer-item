@@ -11,19 +11,34 @@ import (
 	"github.com/terui-ryota/offer-item/internal/application"
 	"github.com/terui-ryota/offer-item/internal/common"
 	"github.com/terui-ryota/offer-item/internal/common/config"
-	//"github.com/terui-ryota/offer-item/internal/infrastructure"
+	"github.com/terui-ryota/offer-item/internal/infrastructure"
 )
 
 // gRPCサーバー初期化
+//func InitializeApp() (common.App, error) {
+//	wire.Build(
+//		app.NewApp,
+//		grpcConf.LoadConfig,
+//		wire.FieldsOf(new(*grpcConf.GRPCConfig), "Database", "Rakuten", "Validation"),
+//		config.LoadDB,
+//		infrastructure.WireSet,
+//		application.WireSet,
+//		presentation.WireSet,
+//		grpcConf.LoadHttpClient,
+//	)
+//	return nil, nil
+//}
+
 func InitializeApp() (common.App, error) {
 	wire.Build(
 		app.NewApp,
 		grpcConf.LoadConfig,
-		wire.FieldsOf(new(*grpcConf.GRPCConfig), "Database"),
+		wire.FieldsOf(new(*grpcConf.GRPCConfig), "Database", "Rakuten", "Validation"),
 		config.LoadDB,
-		//infrastructure.WireSet,
+		infrastructure.WireSet,
 		application.WireSet,
 		presentation.WireSet,
+		grpcConf.LoadHttpClient,
 	)
 	return nil, nil
 }

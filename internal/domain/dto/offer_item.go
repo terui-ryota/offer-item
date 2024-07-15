@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/terui-ryota/offer-item/internal/domain/model"
@@ -260,6 +261,14 @@ func SaveOfferItemPBToDTO(offerItem *offer_item.SaveOfferItem) *OfferItemDTO {
 		i := offerItem.GetCouponBannerId()
 		couponBannerID = &i
 	}
+
+	fmt.Println("============SaveOfferItemPBToDTO===============")
+	fmt.Println("offerItem.GetDraftedItemInfo().GetName(): ", offerItem.GetDraftedItemInfo().GetName())
+	fmt.Println("offerItem.GetDraftedItemInfo().GetContentName(): ", offerItem.GetDraftedItemInfo().GetContentName())
+	fmt.Println("offerItem.GetDraftedItemInfo().GetImageUrl(): ", offerItem.GetDraftedItemInfo().GetImageUrl())
+	fmt.Println("offerItem.GetDraftedItemInfo().GetUrl(): ", offerItem.GetDraftedItemInfo().GetUrl())
+	fmt.Println("offerItem.GetDraftedItemInfo().GetMinCommission(): ", offerItem.GetDraftedItemInfo().GetMinCommission())
+	fmt.Println("============SaveOfferItemPBToDTO===============")
 
 	return &OfferItemDTO{
 		Name:                              offerItem.GetName(),

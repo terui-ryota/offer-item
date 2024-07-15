@@ -514,6 +514,14 @@ func (o *OfferItem) SetIsClosed(v bool) {
 }
 
 func (o *OfferItem) SetDraftedItemInfo(name, contentName, imageURL, url string, minCommission, maxCommission *Commission, offerItemID OfferItemID) error {
+
+	fmt.Println("=======================-")
+	fmt.Println("name: ", name)
+	fmt.Println("contentName: ", contentName)
+	fmt.Println("imageURL: ", imageURL)
+	fmt.Println("url: ", url)
+	fmt.Println("=======================-")
+
 	if err := validateItemInfo(name, contentName, imageURL, url, minCommission, maxCommission); err != nil {
 		return fmt.Errorf("validateItemInfo: %w", err)
 	}

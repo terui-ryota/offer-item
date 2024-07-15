@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // 案件
@@ -327,4 +328,75 @@ func (i *ItemIdentifier) ItemID() ItemID {
 
 func (i *ItemIdentifier) DFItemID() DFItemID {
 	return i.dfItemID
+}
+
+// Material は素材です。
+type Material struct {
+	MaterialType MaterialType
+	Value        string
+}
+
+func (x *Material) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// Key は素材のタイプと値を合わせたキーを取得します。
+func (m Material) Key() string {
+	return fmt.Sprintf("%d#%s", m.MaterialType, m.Value)
+}
+
+// MaterialType はMaterialType型です。
+type MaterialType int
+
+const (
+	MaterialType_MATERIAL_TYPE_UNKNOWN     MaterialType = 0
+	MaterialType_MATERIAL_TYPE_DESCRIPTION MaterialType = 1
+	MaterialType_MATERIAL_TYPE_IMAGE       MaterialType = 2
+)
+
+const (
+	Description = MaterialType(MaterialType_MATERIAL_TYPE_DESCRIPTION)
+	Image       = MaterialType(MaterialType_MATERIAL_TYPE_IMAGE)
+)
+
+// Value はintを返します。
+func (m MaterialType) Value() int {
+	return int(m)
+}
+
+type MaterialList []Material
+
+// GetValues はMaterialListの値一覧を取得します。
+func (ml MaterialList) GetValues() []string {
+	values := make([]string, 0)
+	for _, v := range ml {
+		values = append(values, v.Value)
+	}
+	return values
+}
+
+// GetValuesForHash はハッシュ生成用の値を取得します。
+func (ml MaterialList) GetValuesForHash() []string {
+	values := make([]string, 0)
+	for _, v := range ml {
+		values = append(values, "material:"+strconv.Itoa(v.MaterialType.Value())+"-"+v.Value)
+	}
+	return values
+}
+
+// Distinct は素材の重複を排除します。
+func (ml *MaterialList) Distinct() {
+	maps := make(map[string]Material, len(*ml))
+	for _, v := range *ml {
+		maps[v.Key()] = v
+	}
+
+	list := MaterialList{}
+	for _, v := range maps {
+		list = append(list, v)
+	}
+	*ml = list
 }
