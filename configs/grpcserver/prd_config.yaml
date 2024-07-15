@@ -13,3 +13,22 @@ database:
   max_open_conn: 10
   max_idle_time: 5m
   debug: true
+rakuten:
+  application_id:
+    - "1043443805574411235"
+  rate_limit: 1
+  ichiba:
+    format: json
+    partner_id: _RTampk
+    click_id_prefix: d
+http_client:
+  dial_keep_alive: 60s
+  dial_timeout: 3s
+  http_client_timeout: 10s
+  idle_conn_timeout: 10s
+  insecure_skip_verify: true
+  max_idle_conn: 1000
+  max_idle_conns_per_host: 200
+  response_header_timeout: 5s
+  tls_handshake_timeout: 2s
+

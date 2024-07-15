@@ -13,17 +13,33 @@ import (
 	"github.com/terui-ryota/offer-item/internal/application/usecase"
 	"github.com/terui-ryota/offer-item/internal/common"
 	config2 "github.com/terui-ryota/offer-item/internal/common/config"
+	"github.com/terui-ryota/offer-item/internal/infrastructure/adapter_impl"
+	"github.com/terui-ryota/offer-item/internal/infrastructure/component/rakuten"
+	"github.com/terui-ryota/offer-item/internal/infrastructure/repository_impl"
 )
 
 // Injectors from wire.go:
 
-// gRPCサーバー初期化
 func InitializeApp() (common.App, error) {
 	grpcConfig := config.LoadConfig()
 	database := grpcConfig.Database
 	db := config2.LoadDB(database)
-	offerItemUsecase := usecase.NewOfferItemUsecase(db)
-	offerItemHandler := handler.NewOfferItemHandler(offerItemUsecase)
-	commonApp := app.NewApp(offerItemHandler, grpcConfig)
+	offerItemRepository := repository_impl.NewOfferItemRepositoryImpl()
+	assigneeRepository := repository_impl.NewAssigneeRepositoryImpl()
+	questionnaireRepository := repository_impl.NewQuestionnaireRepositoryImpl()
+	questionnaireQuestionAnswerRepository := repository_impl.NewQuestionnaireQuestionAnswerRepositoryImpl(db)
+	rakutenConfig := grpcConfig.Rakuten
+	client, err := config.LoadHttpClient(grpcConfig)
+	if err != nil {
+		return nil, err
+	}
+	applicationIDHelper := rakuten.NewApplicationIDHelper(rakutenConfig)
+	rakutenIchibaClient := rakuten.NewRakutenIchibaClient(rakutenConfig, client, applicationIDHelper)
+	affiliateItemAdapter := adapter_impl.NewAffiliateItemAdapterImpl(rakutenIchibaClient)
+	examinationRepository := repository_impl.NewExaminationRepositoryImpl()
+	validationConfig := grpcConfig.Validation
+	offerItemUsecase := usecase.NewOfferItemUsecase(db, offerItemRepository, assigneeRepository, questionnaireRepository, questionnaireQuestionAnswerRepository, affiliateItemAdapter, examinationRepository, validationConfig)
+	offerItemHandlerServer := handler.NewOfferItemHandler(offerItemUsecase)
+	commonApp := app.NewApp(offerItemHandlerServer, grpcConfig)
 	return commonApp, nil
 }
