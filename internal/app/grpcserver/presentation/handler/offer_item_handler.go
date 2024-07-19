@@ -108,3 +108,117 @@ func (h *offerItemHandler) ListOfferItem(ctx context.Context, req *offer_item.Li
 		Result:     converter.ListResultModelToPB(result.ListResult()),
 	}, nil
 }
+
+// オファー案件を削除する
+func (h *offerItemHandler) DeleteOfferItem(ctx context.Context, req *offer_item.DeleteOfferItemRequest) (*offer_item.DeleteOfferItemResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	// 削除する
+	if err := h.offerItemUsecase.DeleteOfferItem(ctx, offerItemID); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.DeleteOfferItem: %w", err)
+	}
+
+	return &offer_item.DeleteOfferItemResponse{Request: req}, nil
+}
+
+// オファー案件を検索する
+func (h *offerItemHandler) SearchOfferItem(ctx context.Context, req *offer_item.SearchOfferItemRequest) (*offer_item.SearchOfferItemResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// 検索条件を設定
+	searchCriteria := &dto.SearchOfferItemCriteria{}
+	if req.OptionalItemId != nil {
+		itemID := model.ItemID(req.GetItemId())
+		searchCriteria.ItemIDEqual = &itemID
+	}
+
+	if req.OptionalDfItemId != nil {
+		dfItemID := model.DFItemID(req.GetDfItemId())
+		searchCriteria.DfItemIDEqual = &dfItemID
+	}
+
+	if req.OptionalOfferItemName != nil {
+		offerItemName := req.GetOfferItemName()
+		searchCriteria.NameContains = &offerItemName
+	}
+
+	condition, err := converter.ListConditionPBToModel(req.GetCondition())
+	if err != nil {
+		return nil, fmt.Errorf("converter.ListConditionPBToModel: %w", err)
+	}
+
+	searchResult, err := h.offerItemUsecase.SearchOfferItem(ctx, searchCriteria, condition)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.SearchOfferItem: %w", err)
+	}
+
+	// protoに変換する
+	offerItemPBs := make([]*offer_item.OfferItem, 0, len(searchResult.OfferItems()))
+	for _, offerItem := range searchResult.OfferItems() {
+		offerItemPB, err := converter.OfferItemModelToPB(offerItem)
+		if err != nil {
+			return nil, fmt.Errorf("converter.OfferItemModelToPB: %w", err)
+		}
+		offerItemPBs = append(offerItemPBs, offerItemPB)
+	}
+
+	return &offer_item.SearchOfferItemResponse{
+		Request:    req,
+		OfferItems: offerItemPBs,
+		Result:     converter.ListResultModelToPB(searchResult.ListResult()),
+	}, nil
+}
+
+func (h *offerItemHandler) ListAssigneeOfferItemPair(ctx context.Context, req *offer_item.ListAssigneeOfferItemPairRequest) (*offer_item.ListAssigneeOfferItemPairResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	amebaID := model.AmebaID(req.GetAmebaId())
+
+	listAssigneeOfferItemPairs, err := h.offerItemUsecase.ListAssigneeOfferItemPair(ctx, amebaID)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.BulkGetAssigneesByAmebaID: %w", err)
+	}
+	// protoに変換する
+	assigneeOfferItemPairPBs := make([]*offer_item.AssigneeOfferItemPair, 0, len(listAssigneeOfferItemPairs))
+	for _, assigneeOfferItemPair := range listAssigneeOfferItemPairs {
+		offerItemPB, err := converter.OfferItemModelToPB(assigneeOfferItemPair.OfferItem())
+		if err != nil {
+			return nil, fmt.Errorf("converter.OfferItemModelToPB: %w", err)
+		}
+		assigneeOfferItemPairPB := &offer_item.AssigneeOfferItemPair{
+			Assignee:  converter.AssigneeModelToPB(assigneeOfferItemPair.Assignee()),
+			OfferItem: offerItemPB,
+		}
+		assigneeOfferItemPairPBs = append(assigneeOfferItemPairPBs, assigneeOfferItemPairPB)
+	}
+
+	return &offer_item.ListAssigneeOfferItemPairResponse{
+		Request:               req,
+		AssigneeOfferItemPair: assigneeOfferItemPairPBs,
+	}, nil
+}
+
+// GetQuestionnaire implements offer_item_v2.OfferItemHandlerServer.
+func (h *offerItemHandler) GetQuestionnaire(ctx context.Context, req *offer_item.GetQuestionnaireRequest) (*offer_item.GetQuestionnaireResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+	q, err := h.offerItemUsecase.GetQuestionnaire(ctx, model.OfferItemID(req.GetOfferItemId()))
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.GetQuestionnaire: %w", err)
+	}
+	return &offer_item.GetQuestionnaireResponse{
+		Request:       req,
+		Questionnaire: converter.QuestionnaireModelToPB(q),
+	}, nil
+}

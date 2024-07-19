@@ -148,7 +148,7 @@ func (o *OfferItemRepositoryImpl) Delete(ctx context.Context, tx *sql.Tx, id mod
 }
 
 // 検索条件を指定して、オファー案件を検索する
-func (o *OfferItemRepositoryImpl) Search(ctx context.Context, exec boil.ContextExecutor, criteria *dto.SearchOfferItemCriteria, condition *model.ListCondition, isClosed bool) (*model.ListOfferItemResult, error) {
+func (o *OfferItemRepositoryImpl) Search(ctx context.Context, exec boil.ContextExecutor, criteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
 	ctx, span := trace.StartSpan(ctx, "OfferItemRepository.Search")
 	defer span.End()
 
@@ -167,9 +167,6 @@ func (o *OfferItemRepositoryImpl) Search(ctx context.Context, exec boil.ContextE
 	if criteria.DfItemIDEqual != nil && criteria.DfItemIDEqual.String() != "" {
 		// 文字列比較が大文字小文字を無視するように設定
 		queries = append(queries, qm.Where("LOWER("+entity.OfferItemColumns.DFItemID+") = ?", strings.ToLower(criteria.DfItemIDEqual.String())))
-	}
-	if !isClosed {
-		queries = append(queries, entity.OfferItemWhere.IsClosed.EQ(false))
 	}
 	// データ取得前に検索結果の総数を取得する
 	totalCount, err := entity.OfferItems(queries...).Count(ctx, exec)

@@ -14,7 +14,7 @@ import (
 type OfferItemRepository interface {
 	List(ctx context.Context, exec boil.ContextExecutor, condition *model.ListCondition, isClosed bool) (*model.ListOfferItemResult, error)
 	Delete(ctx context.Context, tx *sql.Tx, id model.OfferItemID) error
-	Search(ctx context.Context, exec boil.ContextExecutor, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition, isClosed bool) (*model.ListOfferItemResult, error)
+	Search(ctx context.Context, exec boil.ContextExecutor, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error)
 	Get(ctx context.Context, exec boil.ContextExecutor, offerItemID model.OfferItemID, withLock bool) (*model.OfferItem, error)
 	Create(ctx context.Context, tx *sql.Tx, offerItem *model.OfferItem) error
 	Update(ctx context.Context, tx *sql.Tx, offerItem *model.OfferItem) error

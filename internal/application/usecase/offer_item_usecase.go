@@ -22,6 +22,10 @@ type OfferItemUsecase interface {
 	SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error
 	GetOfferItem(ctx context.Context, offerItemID model.OfferItemID) (*model.OfferItem, error)
 	ListOfferItem(ctx context.Context, condition *model.ListCondition) (*model.ListOfferItemResult, error)
+	DeleteOfferItem(ctx context.Context, offerItemID model.OfferItemID) error
+	SearchOfferItem(ctx context.Context, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error)
+	ListAssigneeOfferItemPair(ctx context.Context, amebaID model.AmebaID) ([]model.AssigneeOfferItemPair, error)
+	GetQuestionnaire(ctx context.Context, offerItemID model.OfferItemID) (*model.Questionnaire, error)
 }
 
 func NewOfferItemUsecase(
@@ -58,6 +62,90 @@ type offerItemUsecaseImpl struct {
 	//affiliatorAdapter                     adapter.AffiliatorAdapter
 	examinationRepository repository.ExaminationRepository
 	validationConfig      *config.ValidationConfig
+}
+
+// GetQuestionnaire implements OfferItemUsecase.
+func (o *offerItemUsecaseImpl) GetQuestionnaire(ctx context.Context, offerItemID model.OfferItemID) (*model.Questionnaire, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.GetQuestionnaire")
+	defer span.End()
+
+	q, err := o.questionnaireRepository.Get(ctx, o.db, offerItemID, false)
+	if err != nil {
+		return nil, fmt.Errorf("o.questionnaireRepository.Get: %w", err)
+	}
+	return q, nil
+}
+
+// アメーバIDに紐づくアサイニーとオファーアイテムのペアを取得する
+func (o *offerItemUsecaseImpl) ListAssigneeOfferItemPair(ctx context.Context, amebaID model.AmebaID) ([]model.AssigneeOfferItemPair, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.ListAssigneeOfferItemPair")
+	defer span.End()
+
+	assignees, err := o.assigneeRepository.ListByAmebaID(ctx, o.db, amebaID)
+	if err != nil {
+		return nil, fmt.Errorf("o.assigneeRepository.BulkGetByAmebaIDOfferItemIDAmebaIDs: %w", err)
+	}
+
+	offerItemIDs := make([]model.OfferItemID, 0, len(assignees))
+	for _, assignee := range assignees {
+		offerItemIDs = append(offerItemIDs, assignee.OfferItemID())
+	}
+
+	offerItemMap, err := o.offerItemRepository.BulkGet(ctx, o.db, offerItemIDs, false)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.BulkGetByAssigneeID: %w", err)
+	}
+
+	// アイテム情報を付与する
+	for _, offerItem := range offerItemMap {
+		if err = o.addItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
+			return nil, fmt.Errorf("o.addItemInfo: %w", err)
+		}
+	}
+
+	assigneeOfferItemPairs := make([]model.AssigneeOfferItemPair, 0, len(assignees))
+	for _, assignee := range assignees {
+		// isClosedがtrueの案件はmapに含まれないため、存在チェックをする
+		if offerItem, ok := offerItemMap[assignee.OfferItemID()]; ok {
+			assigneeOfferItemPairs = append(assigneeOfferItemPairs, *model.NewAssigneeOfferItemPair(assignee, offerItem))
+		}
+	}
+	return assigneeOfferItemPairs, nil
+}
+
+// オファー案件を検索する
+func (o *offerItemUsecaseImpl) SearchOfferItem(ctx context.Context, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.SearchOfferItem")
+	defer span.End()
+
+	result, err := o.offerItemRepository.Search(ctx, o.db, searchCriteria, condition)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.Search: %w", err)
+	}
+
+	// アイテム情報を付与する
+	if err = o.addItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	}
+
+	return result, nil
+}
+
+// オファー案件を削除する
+func (o *offerItemUsecaseImpl) DeleteOfferItem(ctx context.Context, offerItemID model.OfferItemID) error {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.DeleteOfferItem")
+	defer span.End()
+
+	if err := txhelper.WithTransaction(ctx, o.db, func(tx *sql.Tx) error {
+		if err := o.offerItemRepository.Delete(ctx, tx, offerItemID); err != nil {
+			return fmt.Errorf("o.offerItemRepository.Delete: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("txhelper.WithTransaction: %w", err)
+	}
+
+	return nil
 }
 
 // offer-item、schedule、assignee、questionnaireの作成・更新を行う
