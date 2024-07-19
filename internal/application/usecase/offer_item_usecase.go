@@ -21,6 +21,7 @@ import (
 type OfferItemUsecase interface {
 	SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error
 	GetOfferItem(ctx context.Context, offerItemID model.OfferItemID) (*model.OfferItem, error)
+	ListOfferItem(ctx context.Context, condition *model.ListCondition) (*model.ListOfferItemResult, error)
 }
 
 func NewOfferItemUsecase(
@@ -636,4 +637,22 @@ func (o *offerItemUsecaseImpl) GetOfferItem(ctx context.Context, offerItemID mod
 	}
 
 	return offerItem, nil
+}
+
+// オファー案件一覧を取得する
+func (o *offerItemUsecaseImpl) ListOfferItem(ctx context.Context, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.ListOfferItem")
+	defer span.End()
+
+	result, err := o.offerItemRepository.List(ctx, o.db, condition, true)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.List: %w", err)
+	}
+
+	// アイテム情報を付与する
+	if err = o.addItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	}
+
+	return result, nil
 }

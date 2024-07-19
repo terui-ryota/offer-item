@@ -2,16 +2,15 @@ package adapter_impl
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
+	//"sync"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/terui-ryota/offer-item/internal/domain/model"
 	"github.com/terui-ryota/offer-item/internal/infrastructure/component/rakuten"
 	"github.com/terui-ryota/offer-item/pkg/logger"
-	"golang.org/x/sync/errgroup"
+	//"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/terui-ryota/offer-item/internal/domain/adapter"
@@ -97,51 +96,104 @@ func (a *AffiliateItemAdapterImpl) BulkGetItems(ctx context.Context, itemIdentif
 	return a.bulkGetItems(ctx, itemIdentifiers, true)
 }
 
-func (a *AffiliateItemAdapterImpl) getAffiliateItems(ctx context.Context, pairs model.ItemIdentifiers) (model.AffiliateItemPairList, error) {
-	mutex := &sync.Mutex{}
-	// Context は評価後に Cancel されるため別名で定義する
-	eg, egCtx := errgroup.WithContext(ctx)
+// 並行処理を行うと楽天APIでエラーが発生する
+//func (a *AffiliateItemAdapterImpl) getAffiliateItems(ctx context.Context, pairs model.ItemIdentifiers) (model.AffiliateItemPairList, error) {
+//	mutex := &sync.Mutex{}
+//	// Context は評価後に Cancel されるため別名で定義する
+//	eg, egCtx := errgroup.WithContext(ctx)
+//
+//	var ids []string
+//	for _, v := range pairs {
+//		if v.ItemID().String() != "" || v.DFItemID().String() != "RK000001" {
+//			continue
+//		}
+//		ids = append(ids, v.DFItemID().String())
+//	}
+//
+//	var affiliateItemDFItemList model.AffiliateItemDFItemList
+//
+//	uncachedList := make(model.AffiliateItemDFItemList, 0, len(ids))
+//	for _, itemPair := range pairs {
+//		if itemPair.DFItemID().String() == "" || itemPair.DFItemID().String() == "RK000001" {
+//			continue
+//		}
+//		id := itemPair.DFItemID().String()
+//		eg.Go(func() error {
+//			fmt.Println("================aiueo====================")
+//			v, err, _ := a.sg.Do(id, func() (interface{}, error) {
+//				return a.rakutenClient.GetItemsByItemId(egCtx, id)
+//			})
+//			if err != nil {
+//				switch err := err.(type) {
+//				case rakuten.TooManyRequestsErr:
+//					// 楽天API でリクエスト数超過が出た場合は400系で返却するためにTooManyRequestErrorで返却する
+//					return rakuten.NewASPTooManyRequestError(itemPair.ItemID())
+//				default:
+//					// 正常に取得できた item は返却する必要があるので、リクエスト数超過以外のエラーはここでエラーログで出力し関数自体は正常終了させる。
+//					logger.Default().Error("Failed to get rakuten items by ids", zap.String("id", id), zap.Error(err))
+//					return nil
+//				}
+//			}
+//			result, ok := v.(*rakuten.ItemResult)
+//			if !ok {
+//				return apperr.AffiliateItemInternalError.Wrap(errors.New("failed convert to rakuten.ItemResult"))
+//			}
+//			// model変換
+//			affiliateItemDFItemList = a.convertAffiliateItemDFItems(egCtx, result, itemPair.ItemID())
+//			mutex.Lock()
+//			defer mutex.Unlock()
+//			uncachedList = append(uncachedList, affiliateItemDFItemList...)
+//			return nil
+//		})
+//	}
+//	if err := eg.Wait(); err != nil {
+//		return nil, err
+//	}
+//
+//	var affiliateItemPairList model.AffiliateItemPairList
+//	affiliateItemRate := float32(4)
+//	affiliateItemStaticRate := float32(4)
+//	affiliateItemCommission := model.NewAffiliateItemCommission(&affiliateItemRate, nil, &affiliateItemStaticRate, "")
+//	affiliateItemItem := model.NewAffiliateItemItem("RK000001", "https://stat.amebame.com/pub/content/5164757434/amebapick/item/rakuten/logo.png", "楽天市場", affiliateItemCommission, "楽天株式会社", model.URLMap{model.PlatformTypeAll: "https://www.rakuten.co.jp/"}, true)
+//	for _, affiliateItemDFItem := range uncachedList {
+//		affiliateItemPair := model.NewAffiliateItemPair(affiliateItemItem, affiliateItemDFItem)
+//		affiliateItemPairList = append(affiliateItemPairList, affiliateItemPair)
+//	}
+//	return affiliateItemPairList, nil
+//}
 
+func (a *AffiliateItemAdapterImpl) getAffiliateItems(ctx context.Context, pairs model.ItemIdentifiers) (model.AffiliateItemPairList, error) {
 	var ids []string
 	for _, v := range pairs {
+		if v.ItemID().String() != "" || v.DFItemID().String() != "RK000001" {
+			continue
+		}
 		ids = append(ids, v.DFItemID().String())
 	}
 
-	var affiliateItemDFItemList model.AffiliateItemDFItemList
-	//var err error
-
 	uncachedList := make(model.AffiliateItemDFItemList, 0, len(ids))
 	for _, itemPair := range pairs {
+		if itemPair.DFItemID().String() == "" || itemPair.DFItemID().String() == "RK000001" {
+			continue
+		}
 		id := itemPair.DFItemID().String()
-		eg.Go(func() error {
-			v, err, _ := a.sg.Do(id, func() (interface{}, error) {
-				return a.rakutenClient.GetItemsByItemId(egCtx, id)
-			})
-			if err != nil {
-				switch err := err.(type) {
-				case rakuten.TooManyRequestsErr:
-					// 楽天API でリクエスト数超過が出た場合は400系で返却するためにTooManyRequestErrorで返却する
-					return rakuten.NewASPTooManyRequestError(itemPair.ItemID())
-				default:
-					// 正常に取得できた item は返却する必要があるので、リクエスト数超過以外のエラーはここでエラーログで出力し関数自体は正常終了させる。
-					logger.Default().Error("Failed to get rakuten items by ids", zap.String("id", id), zap.Error(err))
-					return nil
-				}
+
+		result, err := a.rakutenClient.GetItemsByItemId(ctx, id)
+		if err != nil {
+			switch err := err.(type) {
+			case rakuten.TooManyRequestsErr:
+				// 楽天API でリクエスト数超過が出た場合は400系で返却するためにTooManyRequestErrorで返却する
+				return nil, rakuten.NewASPTooManyRequestError(itemPair.ItemID())
+			default:
+				// 正常に取得できた item は返却する必要があるので、リクエスト数超過以外のエラーはここでエラーログで出力し処理を続行する。
+				logger.Default().Error("Failed to get rakuten items by ids", zap.String("id", id), zap.Error(err))
+				continue
 			}
-			result, ok := v.(*rakuten.ItemResult)
-			if !ok {
-				return apperr.AffiliateItemInternalError.Wrap(errors.New("failed convert to rakuten.ItemResult"))
-			}
-			// model変換
-			affiliateItemDFItemList = a.convertAffiliateItemDFItems(egCtx, result, itemPair.ItemID())
-			mutex.Lock()
-			defer mutex.Unlock()
-			uncachedList = append(uncachedList, affiliateItemDFItemList...)
-			return nil
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return nil, err
+		}
+
+		// model変換
+		affiliateItemDFItemList := a.convertAffiliateItemDFItems(ctx, result, itemPair.ItemID())
+		uncachedList = append(uncachedList, affiliateItemDFItemList...)
 	}
 
 	var affiliateItemPairList model.AffiliateItemPairList

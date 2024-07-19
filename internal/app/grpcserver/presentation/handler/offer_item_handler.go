@@ -73,3 +73,38 @@ func (h *offerItemHandler) GetOfferItem(ctx context.Context, req *offer_item.Get
 		OfferItem: offerItemPB,
 	}, nil
 }
+
+// オファー案件一覧取得
+func (h *offerItemHandler) ListOfferItem(ctx context.Context, req *offer_item.ListOfferItemRequest) (*offer_item.ListOfferItemResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	condition, err := converter.ListConditionPBToModel(req.GetCondition())
+	if err != nil {
+		return nil, fmt.Errorf("converter.ListConditionPBToModel: %w", err)
+	}
+
+	// オファー案件一覧を取得
+	result, err := h.offerItemUsecase.ListOfferItem(ctx, condition)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.ListOfferItem: %w", err)
+	}
+
+	// protoに変換する
+	offerItemPBs := make([]*offer_item.OfferItem, 0, len(result.OfferItems()))
+	for _, offerItem := range result.OfferItems() {
+		offerItemPB, err := converter.OfferItemModelToPB(offerItem)
+		if err != nil {
+			return nil, fmt.Errorf("converter.OfferItemModelToPB: %w", err)
+		}
+		offerItemPBs = append(offerItemPBs, offerItemPB)
+	}
+
+	return &offer_item.ListOfferItemResponse{
+		Request:    req,
+		OfferItems: offerItemPBs,
+		Result:     converter.ListResultModelToPB(result.ListResult()),
+	}, nil
+}
