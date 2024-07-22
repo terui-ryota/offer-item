@@ -476,8 +476,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/subosito/gotenv v1.3.0/go.mod h1:YzJjq/33h7nrwdY+iHMhEOEEbW0ovIz0tB6t6PwAXzs=
 github.com/subosito/gotenv v1.4.1/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
-github.com/terui-ryota/protofiles v1.17.0 h1:e2jfl0ACpIjFRygxv8yVYJrgKEiwfQORLhLMUipzeAQ=
-github.com/terui-ryota/protofiles v1.17.0/go.mod h1:v6h9rsala6dDlWc8zN9bctT8bQgU7usHMUemlhS4Tpo=
+github.com/terui-ryota/protofiles v1.19.0 h1:ejVxcDI/JJjq5tJoHhWxHvhKS2MW/ElqFuT0123vf78=
+github.com/terui-ryota/protofiles v1.19.0/go.mod h1:v6h9rsala6dDlWc8zN9bctT8bQgU7usHMUemlhS4Tpo=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/volatiletech/inflect v0.0.1 h1:2a6FcMQyhmPZcLa+uet3VJ8gLn/9svWhJxJYwvE8KsU=
 github.com/volatiletech/inflect v0.0.1/go.mod h1:IBti31tG6phkHitLlr5j7shC5SOo//x0AjDzaJU1PLA=

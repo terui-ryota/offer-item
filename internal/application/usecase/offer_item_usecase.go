@@ -8,6 +8,7 @@ import (
 
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/config"
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/presentation/converter"
+	"github.com/terui-ryota/offer-item/internal/application/service"
 	"github.com/terui-ryota/offer-item/internal/common/txhelper"
 	"github.com/terui-ryota/offer-item/internal/domain/adapter"
 	"github.com/terui-ryota/offer-item/internal/domain/dto"
@@ -38,6 +39,7 @@ func NewOfferItemUsecase(
 	// affiliatorAdapter adapter.AffiliatorAdapter,
 	examinationRepository repository.ExaminationRepository,
 	validationConfig *config.ValidationConfig,
+	offerItemService service.OfferItemService,
 ) OfferItemUsecase {
 	return &offerItemUsecaseImpl{
 		db:                                    db,
@@ -49,6 +51,7 @@ func NewOfferItemUsecase(
 		//affiliatorAdapter:                     affiliatorAdapter,
 		examinationRepository: examinationRepository,
 		validationConfig:      validationConfig,
+		offerItemService:      offerItemService,
 	}
 }
 
@@ -62,6 +65,7 @@ type offerItemUsecaseImpl struct {
 	//affiliatorAdapter                     adapter.AffiliatorAdapter
 	examinationRepository repository.ExaminationRepository
 	validationConfig      *config.ValidationConfig
+	offerItemService      service.OfferItemService
 }
 
 // GetQuestionnaire implements OfferItemUsecase.
@@ -96,10 +100,10 @@ func (o *offerItemUsecaseImpl) ListAssigneeOfferItemPair(ctx context.Context, am
 		return nil, fmt.Errorf("o.offerItemRepository.BulkGetByAssigneeID: %w", err)
 	}
 
-	// アイテム情報を付与する
 	for _, offerItem := range offerItemMap {
-		if err = o.addItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
-			return nil, fmt.Errorf("o.addItemInfo: %w", err)
+		// アイテム情報を付与する
+		if err = o.offerItemService.AddItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
+			return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
 		}
 	}
 
@@ -124,8 +128,8 @@ func (o *offerItemUsecaseImpl) SearchOfferItem(ctx context.Context, searchCriter
 	}
 
 	// アイテム情報を付与する
-	if err = o.addItemInfo(ctx, result.OfferItems()); err != nil {
-		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	if err = o.offerItemService.AddItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
 	}
 
 	return result, nil
@@ -675,40 +679,40 @@ func setAssigneeFields(assignee *model.Assignee, d *dto.Assignee) error {
 	return nil
 }
 
-func (o *offerItemUsecaseImpl) addItemInfo(ctx context.Context, offerItems model.OfferItemList) error {
-	itemIdentifiers := offerItems.ItemIdentifiers()
-
-	// 案件ID、DF案件IDが設定されているオファー案件がない場合、何もしない
-	if len(itemIdentifiers) == 0 {
-		return nil
-	}
-
-	// 案件情報を取得
-	itemMap, err := o.affiliateItemAdapter.BulkGetItems(ctx, itemIdentifiers)
-	if err != nil {
-		return fmt.Errorf("o.affiliateItemAdapter.BulkGetItems: %w", err)
-	}
-
-	// 取得した情報を適用する
-	for _, offerItem := range offerItems {
-		var dfItemID model.DFItemID
-		if offerItem.DfItem() != nil {
-			dfItemID = offerItem.DfItem().ID()
-		}
-
-		// 案件情報を適用
-		if items, ok := itemMap[*model.NewItemIdentifier(offerItem.Item().ID(), dfItemID)]; ok {
-			if err := offerItem.SetItem(&items.Item); err != nil {
-				return fmt.Errorf("offerItem.SetItem: %w", err)
-			}
-			if items.DFItem.Exists() {
-				offerItem.SetDFItem(&items.DFItem)
-			}
-		}
-	}
-
-	return nil
-}
+//func (o *offerItemUsecaseImpl) addItemInfo(ctx context.Context, offerItems model.OfferItemList) error {
+//	itemIdentifiers := offerItems.ItemIdentifiers()
+//
+//	// 案件ID、DF案件IDが設定されているオファー案件がない場合、何もしない
+//	if len(itemIdentifiers) == 0 {
+//		return nil
+//	}
+//
+//	// 案件情報を取得
+//	itemMap, err := o.affiliateItemAdapter.BulkGetItems(ctx, itemIdentifiers)
+//	if err != nil {
+//		return fmt.Errorf("o.affiliateItemAdapter.BulkGetItems: %w", err)
+//	}
+//
+//	// 取得した情報を適用する
+//	for _, offerItem := range offerItems {
+//		var dfItemID model.DFItemID
+//		if offerItem.DfItem() != nil {
+//			dfItemID = offerItem.DfItem().ID()
+//		}
+//
+//		// 案件情報を適用
+//		if items, ok := itemMap[*model.NewItemIdentifier(offerItem.Item().ID(), dfItemID)]; ok {
+//			if err := offerItem.SetItem(&items.Item); err != nil {
+//				return fmt.Errorf("offerItem.SetItem: %w", err)
+//			}
+//			if items.DFItem.Exists() {
+//				offerItem.SetDFItem(&items.DFItem)
+//			}
+//		}
+//	}
+//
+//	return nil
+//}
 
 func (o *offerItemUsecaseImpl) GetOfferItem(ctx context.Context, offerItemID model.OfferItemID) (*model.OfferItem, error) {
 	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.GetOfferItem")
@@ -720,8 +724,8 @@ func (o *offerItemUsecaseImpl) GetOfferItem(ctx context.Context, offerItemID mod
 	}
 
 	// アイテム情報を付与する
-	if err = o.addItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
-		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	if err = o.offerItemService.AddItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
 	}
 
 	return offerItem, nil
@@ -738,8 +742,8 @@ func (o *offerItemUsecaseImpl) ListOfferItem(ctx context.Context, condition *mod
 	}
 
 	// アイテム情報を付与する
-	if err = o.addItemInfo(ctx, result.OfferItems()); err != nil {
-		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	if err = o.offerItemService.AddItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
 	}
 
 	return result, nil

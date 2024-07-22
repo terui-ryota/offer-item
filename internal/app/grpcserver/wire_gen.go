@@ -10,6 +10,7 @@ import (
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/app"
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/config"
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/presentation/handler"
+	"github.com/terui-ryota/offer-item/internal/application/service"
 	"github.com/terui-ryota/offer-item/internal/application/usecase"
 	"github.com/terui-ryota/offer-item/internal/common"
 	config2 "github.com/terui-ryota/offer-item/internal/common/config"
@@ -38,8 +39,10 @@ func InitializeApp() (common.App, error) {
 	affiliateItemAdapter := adapter_impl.NewAffiliateItemAdapterImpl(rakutenIchibaClient)
 	examinationRepository := repository_impl.NewExaminationRepositoryImpl()
 	validationConfig := grpcConfig.Validation
-	offerItemUsecase := usecase.NewOfferItemUsecase(db, offerItemRepository, assigneeRepository, questionnaireRepository, questionnaireQuestionAnswerRepository, affiliateItemAdapter, examinationRepository, validationConfig)
-	offerItemHandlerServer := handler.NewOfferItemHandler(offerItemUsecase)
+	offerItemService := service.NewOfferItemServiceImpl(affiliateItemAdapter)
+	offerItemUsecase := usecase.NewOfferItemUsecase(db, offerItemRepository, assigneeRepository, questionnaireRepository, questionnaireQuestionAnswerRepository, affiliateItemAdapter, examinationRepository, validationConfig, offerItemService)
+	assigneeUsecase := usecase.NewAssigneeUsecase(db, grpcConfig, assigneeRepository, offerItemRepository, questionnaireRepository, questionnaireQuestionAnswerRepository)
+	offerItemHandlerServer := handler.NewOfferItemHandler(offerItemUsecase, assigneeUsecase)
 	commonApp := app.NewApp(offerItemHandlerServer, grpcConfig)
 	return commonApp, nil
 }

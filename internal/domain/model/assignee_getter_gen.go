@@ -24,3 +24,9 @@ func (a *Assignee) DeclineReason() *string {
 func (a *Assignee) CreatedAt() time.Time {
 	return a.createdAt
 }
+func (a *Assignee) ShippingData() []string {
+	return a.shippingData
+}
+func (a *Assignee) JanCode() *string {
+	return a.janCode
+}

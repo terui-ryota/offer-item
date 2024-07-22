@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/presentation/converter"
@@ -12,14 +13,16 @@ import (
 	offer_item "github.com/terui-ryota/protofiles/go/offer_item"
 )
 
-func NewOfferItemHandler(offerItemUsecase usecase.OfferItemUsecase) offer_item.OfferItemHandlerServer {
+func NewOfferItemHandler(offerItemUsecase usecase.OfferItemUsecase, assigneeUsecase usecase.AssigneeUsecase) offer_item.OfferItemHandlerServer {
 	return &offerItemHandler{
 		offerItemUsecase: offerItemUsecase,
+		assigneeUsecase:  assigneeUsecase,
 	}
 }
 
 type offerItemHandler struct {
 	offerItemUsecase usecase.OfferItemUsecase
+	assigneeUsecase  usecase.AssigneeUsecase
 	offer_item.UnimplementedOfferItemHandlerServer
 }
 
@@ -220,5 +223,128 @@ func (h *offerItemHandler) GetQuestionnaire(ctx context.Context, req *offer_item
 	return &offer_item.GetQuestionnaireResponse{
 		Request:       req,
 		Questionnaire: converter.QuestionnaireModelToPB(q),
+	}, nil
+}
+
+func (h *offerItemHandler) ListAssignee(ctx context.Context, req *offer_item.ListAssigneeRequest) (*offer_item.ListAssigneeResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+	stage := model.Stage(req.GetStage())
+
+	assignees, err := h.assigneeUsecase.ListAssignee(ctx, offerItemID, stage)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.ListAssignee: %w", err)
+	}
+
+	// protoに変換する
+	assigneePBs := make([]*offer_item.Assignee, 0, len(assignees))
+	for _, assignee := range assignees {
+		assigneePBs = append(assigneePBs, converter.AssigneeModelToPB(assignee))
+	}
+
+	return &offer_item.ListAssigneeResponse{
+		Request:   req,
+		Assignees: assigneePBs,
+	}, nil
+}
+
+func (h *offerItemHandler) ListAssigneeUnderExamination(ctx context.Context, req *offer_item.ListAssigneeUnderExaminationRequest) (*offer_item.ListAssigneeUnderExaminationResponse, error) {
+	assignees, err := h.assigneeUsecase.ListAssigneeUnderExamination(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.ListAssigneeUnderExamination: %w", err)
+	}
+
+	// protoに変換する
+	assigneePBs := make([]*offer_item.Assignee, 0, len(assignees))
+	for _, assignee := range assignees {
+		assigneePBs = append(assigneePBs, converter.AssigneeModelToPB(assignee))
+	}
+
+	return &offer_item.ListAssigneeUnderExaminationResponse{
+		Request:   req,
+		Assignees: assigneePBs,
+	}, nil
+}
+
+func (h *offerItemHandler) ListStageAssigneeCount(ctx context.Context, req *offer_item.ListStageAssigneeCountRequest) (*offer_item.ListStageAssigneeCountResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	assigneeCounts, err := h.assigneeUsecase.ListAssigneeCount(ctx, offerItemID)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.ListAssigneeCount: %w", err)
+	}
+
+	// protoに変換する
+	assigneeCountsPB := make([]*offer_item.AssigneeCount, 0, len(assigneeCounts))
+	for _, assigneeCount := range assigneeCounts {
+		assigneeCountPB := converter.AssigneeCountModelToPB(assigneeCount)
+		assigneeCountsPB = append(assigneeCountsPB, assigneeCountPB)
+	}
+
+	return &offer_item.ListStageAssigneeCountResponse{
+		Request:        req,
+		AssigneeCounts: assigneeCountsPB,
+	}, nil
+}
+
+func (h *offerItemHandler) InviteOffer(ctx context.Context, req *offer_item.InviteOfferRequest) (*offer_item.InviteOfferResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	if err := h.assigneeUsecase.InviteOffer(ctx, offerItemID); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.InviteOffer: %w", err)
+	}
+
+	return &offer_item.InviteOfferResponse{
+		Request: req,
+	}, nil
+}
+
+func (h *offerItemHandler) UploadLotteryResults(ctx context.Context, req *offer_item.UploadLotteryResultsRequest) (*offer_item.UploadLotteryResultsResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// 古いフィールドを参照したら怒るようにする(後続処理を行わずにエラー)
+	// adminを上げた後、protofilesを削除し、この行を削除する
+	//nolint:staticcheck
+	if len(req.GetMapLotteryResult()) > 0 {
+		return nil, apperr.OfferItemValidationError.Wrap(errors.New("please don't specify this field coz this is deprecated"))
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+	mapLotteryResult := make(map[model.AmebaID]model.LotteryResult, len(req.GetMapLotteryResultWithShippingData()))
+	for amebaID, lotteryResult := range req.GetMapLotteryResultWithShippingData() {
+		var janCode *string
+		if lotteryResult.GetOptionalJanCode() != nil {
+			janCode = func() *string {
+				s := lotteryResult.GetJanCode()
+				return &s
+			}()
+		}
+		lr := model.NewLotteryResult(lotteryResult.GetIsPassedLottery(), lotteryResult.GetShippingData(), janCode)
+		mapLotteryResult[model.AmebaID(amebaID)] = *lr
+	}
+
+	if err := h.assigneeUsecase.UploadLotteryResults(ctx, offerItemID, mapLotteryResult); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.UploadLotteryResult: %w", err)
+	}
+
+	return &offer_item.UploadLotteryResultsResponse{
+		Request: req,
 	}, nil
 }

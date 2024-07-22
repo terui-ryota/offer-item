@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"github.com/google/wire"
+	"github.com/terui-ryota/offer-item/internal/application/service"
 	"github.com/terui-ryota/offer-item/internal/infrastructure/component/rakuten"
 
 	"github.com/terui-ryota/offer-item/internal/infrastructure/adapter_impl"
@@ -17,4 +18,5 @@ var WireSet = wire.NewSet(
 	adapter_impl.NewAffiliateItemAdapterImpl,
 	rakuten.NewRakutenIchibaClient,
 	rakuten.NewApplicationIDHelper,
+	service.NewOfferItemServiceImpl,
 )
