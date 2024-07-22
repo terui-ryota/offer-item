@@ -8,6 +8,7 @@ import (
 
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/config"
 	"github.com/terui-ryota/offer-item/internal/app/grpcserver/presentation/converter"
+	"github.com/terui-ryota/offer-item/internal/application/service"
 	"github.com/terui-ryota/offer-item/internal/common/txhelper"
 	"github.com/terui-ryota/offer-item/internal/domain/adapter"
 	"github.com/terui-ryota/offer-item/internal/domain/dto"
@@ -21,6 +22,11 @@ import (
 type OfferItemUsecase interface {
 	SaveOfferItem(ctx context.Context, offerItemDTO *dto.OfferItemDTO) error
 	GetOfferItem(ctx context.Context, offerItemID model.OfferItemID) (*model.OfferItem, error)
+	ListOfferItem(ctx context.Context, condition *model.ListCondition) (*model.ListOfferItemResult, error)
+	DeleteOfferItem(ctx context.Context, offerItemID model.OfferItemID) error
+	SearchOfferItem(ctx context.Context, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error)
+	ListAssigneeOfferItemPair(ctx context.Context, amebaID model.AmebaID) ([]model.AssigneeOfferItemPair, error)
+	GetQuestionnaire(ctx context.Context, offerItemID model.OfferItemID) (*model.Questionnaire, error)
 }
 
 func NewOfferItemUsecase(
@@ -33,6 +39,7 @@ func NewOfferItemUsecase(
 	// affiliatorAdapter adapter.AffiliatorAdapter,
 	examinationRepository repository.ExaminationRepository,
 	validationConfig *config.ValidationConfig,
+	offerItemService service.OfferItemService,
 ) OfferItemUsecase {
 	return &offerItemUsecaseImpl{
 		db:                                    db,
@@ -44,6 +51,7 @@ func NewOfferItemUsecase(
 		//affiliatorAdapter:                     affiliatorAdapter,
 		examinationRepository: examinationRepository,
 		validationConfig:      validationConfig,
+		offerItemService:      offerItemService,
 	}
 }
 
@@ -57,6 +65,91 @@ type offerItemUsecaseImpl struct {
 	//affiliatorAdapter                     adapter.AffiliatorAdapter
 	examinationRepository repository.ExaminationRepository
 	validationConfig      *config.ValidationConfig
+	offerItemService      service.OfferItemService
+}
+
+// GetQuestionnaire implements OfferItemUsecase.
+func (o *offerItemUsecaseImpl) GetQuestionnaire(ctx context.Context, offerItemID model.OfferItemID) (*model.Questionnaire, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.GetQuestionnaire")
+	defer span.End()
+
+	q, err := o.questionnaireRepository.Get(ctx, o.db, offerItemID, false)
+	if err != nil {
+		return nil, fmt.Errorf("o.questionnaireRepository.Get: %w", err)
+	}
+	return q, nil
+}
+
+// アメーバIDに紐づくアサイニーとオファーアイテムのペアを取得する
+func (o *offerItemUsecaseImpl) ListAssigneeOfferItemPair(ctx context.Context, amebaID model.AmebaID) ([]model.AssigneeOfferItemPair, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.ListAssigneeOfferItemPair")
+	defer span.End()
+
+	assignees, err := o.assigneeRepository.ListByAmebaID(ctx, o.db, amebaID)
+	if err != nil {
+		return nil, fmt.Errorf("o.assigneeRepository.BulkGetByAmebaIDOfferItemIDAmebaIDs: %w", err)
+	}
+
+	offerItemIDs := make([]model.OfferItemID, 0, len(assignees))
+	for _, assignee := range assignees {
+		offerItemIDs = append(offerItemIDs, assignee.OfferItemID())
+	}
+
+	offerItemMap, err := o.offerItemRepository.BulkGet(ctx, o.db, offerItemIDs, false)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.BulkGetByAssigneeID: %w", err)
+	}
+
+	for _, offerItem := range offerItemMap {
+		// アイテム情報を付与する
+		if err = o.offerItemService.AddItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
+			return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
+		}
+	}
+
+	assigneeOfferItemPairs := make([]model.AssigneeOfferItemPair, 0, len(assignees))
+	for _, assignee := range assignees {
+		// isClosedがtrueの案件はmapに含まれないため、存在チェックをする
+		if offerItem, ok := offerItemMap[assignee.OfferItemID()]; ok {
+			assigneeOfferItemPairs = append(assigneeOfferItemPairs, *model.NewAssigneeOfferItemPair(assignee, offerItem))
+		}
+	}
+	return assigneeOfferItemPairs, nil
+}
+
+// オファー案件を検索する
+func (o *offerItemUsecaseImpl) SearchOfferItem(ctx context.Context, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.SearchOfferItem")
+	defer span.End()
+
+	result, err := o.offerItemRepository.Search(ctx, o.db, searchCriteria, condition)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.Search: %w", err)
+	}
+
+	// アイテム情報を付与する
+	if err = o.offerItemService.AddItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
+	}
+
+	return result, nil
+}
+
+// オファー案件を削除する
+func (o *offerItemUsecaseImpl) DeleteOfferItem(ctx context.Context, offerItemID model.OfferItemID) error {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.DeleteOfferItem")
+	defer span.End()
+
+	if err := txhelper.WithTransaction(ctx, o.db, func(tx *sql.Tx) error {
+		if err := o.offerItemRepository.Delete(ctx, tx, offerItemID); err != nil {
+			return fmt.Errorf("o.offerItemRepository.Delete: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("txhelper.WithTransaction: %w", err)
+	}
+
+	return nil
 }
 
 // offer-item、schedule、assignee、questionnaireの作成・更新を行う
@@ -586,40 +679,40 @@ func setAssigneeFields(assignee *model.Assignee, d *dto.Assignee) error {
 	return nil
 }
 
-func (o *offerItemUsecaseImpl) addItemInfo(ctx context.Context, offerItems model.OfferItemList) error {
-	itemIdentifiers := offerItems.ItemIdentifiers()
-
-	// 案件ID、DF案件IDが設定されているオファー案件がない場合、何もしない
-	if len(itemIdentifiers) == 0 {
-		return nil
-	}
-
-	// 案件情報を取得
-	itemMap, err := o.affiliateItemAdapter.BulkGetItems(ctx, itemIdentifiers)
-	if err != nil {
-		return fmt.Errorf("o.affiliateItemAdapter.BulkGetItems: %w", err)
-	}
-
-	// 取得した情報を適用する
-	for _, offerItem := range offerItems {
-		var dfItemID model.DFItemID
-		if offerItem.DfItem() != nil {
-			dfItemID = offerItem.DfItem().ID()
-		}
-
-		// 案件情報を適用
-		if items, ok := itemMap[*model.NewItemIdentifier(offerItem.Item().ID(), dfItemID)]; ok {
-			if err := offerItem.SetItem(&items.Item); err != nil {
-				return fmt.Errorf("offerItem.SetItem: %w", err)
-			}
-			if items.DFItem.Exists() {
-				offerItem.SetDFItem(&items.DFItem)
-			}
-		}
-	}
-
-	return nil
-}
+//func (o *offerItemUsecaseImpl) addItemInfo(ctx context.Context, offerItems model.OfferItemList) error {
+//	itemIdentifiers := offerItems.ItemIdentifiers()
+//
+//	// 案件ID、DF案件IDが設定されているオファー案件がない場合、何もしない
+//	if len(itemIdentifiers) == 0 {
+//		return nil
+//	}
+//
+//	// 案件情報を取得
+//	itemMap, err := o.affiliateItemAdapter.BulkGetItems(ctx, itemIdentifiers)
+//	if err != nil {
+//		return fmt.Errorf("o.affiliateItemAdapter.BulkGetItems: %w", err)
+//	}
+//
+//	// 取得した情報を適用する
+//	for _, offerItem := range offerItems {
+//		var dfItemID model.DFItemID
+//		if offerItem.DfItem() != nil {
+//			dfItemID = offerItem.DfItem().ID()
+//		}
+//
+//		// 案件情報を適用
+//		if items, ok := itemMap[*model.NewItemIdentifier(offerItem.Item().ID(), dfItemID)]; ok {
+//			if err := offerItem.SetItem(&items.Item); err != nil {
+//				return fmt.Errorf("offerItem.SetItem: %w", err)
+//			}
+//			if items.DFItem.Exists() {
+//				offerItem.SetDFItem(&items.DFItem)
+//			}
+//		}
+//	}
+//
+//	return nil
+//}
 
 func (o *offerItemUsecaseImpl) GetOfferItem(ctx context.Context, offerItemID model.OfferItemID) (*model.OfferItem, error) {
 	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.GetOfferItem")
@@ -631,9 +724,27 @@ func (o *offerItemUsecaseImpl) GetOfferItem(ctx context.Context, offerItemID mod
 	}
 
 	// アイテム情報を付与する
-	if err = o.addItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
-		return nil, fmt.Errorf("o.addItemInfo: %w", err)
+	if err = o.offerItemService.AddItemInfo(ctx, model.OfferItemList{offerItem}); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
 	}
 
 	return offerItem, nil
+}
+
+// オファー案件一覧を取得する
+func (o *offerItemUsecaseImpl) ListOfferItem(ctx context.Context, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
+	ctx, span := trace.StartSpan(ctx, "offerItemUsecaseImpl.ListOfferItem")
+	defer span.End()
+
+	result, err := o.offerItemRepository.List(ctx, o.db, condition, true)
+	if err != nil {
+		return nil, fmt.Errorf("o.offerItemRepository.List: %w", err)
+	}
+
+	// アイテム情報を付与する
+	if err = o.offerItemService.AddItemInfo(ctx, result.OfferItems()); err != nil {
+		return nil, fmt.Errorf("o.offerItemService.AddItemInfo: %w", err)
+	}
+
+	return result, nil
 }

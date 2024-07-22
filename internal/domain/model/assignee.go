@@ -29,6 +29,10 @@ type Assignee struct {
 	declineReason *string
 	// 作成日時
 	createdAt time.Time
+	// 発送情報
+	shippingData []string
+	// 発送した商品のJANコード
+	janCode *string
 }
 
 func NewAssignee(
@@ -72,6 +76,37 @@ func NewAssigneeFromRepository(
 	}
 }
 
+type LotteryResult struct {
+	isPassedLottery bool         // 選考を通過したかどうか
+	shippingData    ShippingData // 選考結果インポート時に `発送した商品`というフィールド名のもの(順序保証)。選考以降でサンプルありの場合、nil以外が入る
+	janCode         *string
+}
+
+type ShippingData []string
+
+func (lr *LotteryResult) IsPassedLottery() bool {
+	return lr.isPassedLottery
+}
+
+func (lr *LotteryResult) ShippingData() []string {
+	return lr.shippingData
+}
+
+func (lr *LotteryResult) JanCode() *string {
+	return lr.janCode
+}
+
+func NewLotteryResult(isPassedLottery bool, shippingData []string, janCode *string) *LotteryResult {
+	if shippingData == nil { // リクエストによるので、ここでnilなら空配列を入れておく
+		shippingData = []string{}
+	}
+	return &LotteryResult{
+		isPassedLottery: isPassedLottery,
+		shippingData:    shippingData,
+		janCode:         janCode,
+	}
+}
+
 func (a *Assignee) SetWritingFee(v int) error {
 	if v < 0 {
 		return apperr.OfferItemValidationError.Wrap(errors.New("writingFee must be greater than 0"))
@@ -90,13 +125,15 @@ func (a *Assignee) SetStageShipment() error {
 }
 
 // ステージを「抽選」からからオファーアイテムの設定項目を確認し、適切なステージに変更する
-func (a *Assignee) ChangeStageByLotteryResult(offerItem *OfferItem) error {
+func (a *Assignee) ChangeStageByLotteryResult(offerItem *OfferItem, shippingData []string, janCode *string) error {
 	if a.Stage() != StageLottery {
 		return apperr.OfferItemValidationError.Wrap(errors.New("stage must be StageLottery"))
 	}
 	switch {
-	case offerItem.HasSample(): // サンプルがある
+	case offerItem.HasSample(): // サンプルがある場合。発送情報を入れる
 		a.stage = StageShipment
+		a.shippingData = shippingData
+		a.janCode = janCode
 	case offerItem.NeedsPreliminaryReview(): // 事前審査が必要
 		a.stage = StageDraftSubmission
 	default:

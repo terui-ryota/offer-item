@@ -128,18 +128,18 @@ func (mr *MockOfferItemRepositoryMockRecorder) ListIDsByEndDate(ctx, exec, since
 }
 
 // Search mocks base method.
-func (m *MockOfferItemRepository) Search(ctx context.Context, exec boil.ContextExecutor, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition, isClosed bool) (*model.ListOfferItemResult, error) {
+func (m *MockOfferItemRepository) Search(ctx context.Context, exec boil.ContextExecutor, searchCriteria *dto.SearchOfferItemCriteria, condition *model.ListCondition) (*model.ListOfferItemResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Search", ctx, exec, searchCriteria, condition, isClosed)
+	ret := m.ctrl.Call(m, "Search", ctx, exec, searchCriteria, condition)
 	ret0, _ := ret[0].(*model.ListOfferItemResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Search indicates an expected call of Search.
-func (mr *MockOfferItemRepositoryMockRecorder) Search(ctx, exec, searchCriteria, condition, isClosed interface{}) *gomock.Call {
+func (mr *MockOfferItemRepositoryMockRecorder) Search(ctx, exec, searchCriteria, condition interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Search", reflect.TypeOf((*MockOfferItemRepository)(nil).Search), ctx, exec, searchCriteria, condition, isClosed)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Search", reflect.TypeOf((*MockOfferItemRepository)(nil).Search), ctx, exec, searchCriteria, condition)
 }
 
 // Update mocks base method.
