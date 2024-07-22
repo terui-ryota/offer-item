@@ -9,6 +9,5 @@ import (
 var WireSet = wire.NewSet(
 	usecase.NewOfferItemUsecase,
 	usecase.NewAssigneeUsecase,
-	//usecase.NewExaminationUsecase,
-	//usecase.NewAddDraftedItemInfoBatchUsecase,
+	usecase.NewExaminationUsecase,
 )

@@ -26,6 +26,159 @@ type offerItemHandler struct {
 	offer_item.UnimplementedOfferItemHandlerServer
 }
 
+func (h *offerItemHandler) Decline(ctx context.Context, req *offer_item.DeclineRequest) (*offer_item.DeclineResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+	amebaID := model.AmebaID(req.GetAmebaId())
+	reason := req.GetDeclineReason()
+
+	if err := h.assigneeUsecase.Decline(ctx, offerItemID, amebaID, reason); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.Decline: %w", err)
+	}
+
+	return &offer_item.DeclineResponse{
+		Request: req,
+	}, nil
+}
+
+func (h *offerItemHandler) Invitation(ctx context.Context, req *offer_item.InvitationRequest) (*offer_item.InvitationResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+	amebaID := model.AmebaID(req.GetAmebaId())
+
+	questionAnswers := make(map[model.QuestionID]string)
+	for _, a := range req.GetQuestionAnswers() {
+		questionAnswers[model.QuestionID(a.GetQuestionId())] = a.GetContent()
+	}
+
+	if err := h.assigneeUsecase.Invitation(ctx, offerItemID, amebaID, req.InvitationFlag, questionAnswers); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.Invitation: %w", err)
+	}
+
+	return &offer_item.InvitationResponse{
+		Request: req,
+	}, nil
+}
+
+// BulkGetQuestionnaireQuestionAnswers implements offer_item_v2.OfferItemHandlerServer.
+func (h *offerItemHandler) BulkGetQuestionnaireQuestionAnswers(ctx context.Context, req *offer_item.BulkGetQuestionnaireQuestionAnswersRequest) (*offer_item.BulkGetQuestionnaireQuestionAnswersResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+	answers, err := h.assigneeUsecase.BulkGetQuestionnaireQuestionAnswers(ctx, model.OfferItemID(req.OfferItemId), func() []model.AmebaID {
+		ids := make([]model.AmebaID, 0, len(req.GetAmebaIds()))
+		for _, a := range req.GetAmebaIds() {
+			ids = append(ids, model.AmebaID(a))
+		}
+		return ids
+	}())
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.BulkGetQuestionnaireQuestionAnswers: %w", err)
+	}
+	return &offer_item.BulkGetQuestionnaireQuestionAnswersResponse{
+		Request: req,
+		AmebaIdAnswersMap: func() map[string]*offer_item.BulkGetQuestionnaireQuestionAnswersResponse_QuestionAnswerMap {
+			m := make(map[string]*offer_item.BulkGetQuestionnaireQuestionAnswersResponse_QuestionAnswerMap)
+			for amebaID, answers := range answers {
+				as := &offer_item.BulkGetQuestionnaireQuestionAnswersResponse_QuestionAnswerMap{
+					QuestionIdAnswerMap: func() map[string]*offer_item.QuestionAnswer {
+						res := make(map[string]*offer_item.QuestionAnswer)
+						for _, answer := range answers {
+							res[answer.QuestionID().String()] = converter.QuestionAnswerModelToPB(&answer)
+						}
+						return res
+					}(),
+				}
+				m[amebaID.String()] = as
+			}
+			return m
+		}(),
+	}, nil
+}
+
+func (h *offerItemHandler) GetAssigneeByAmebaIDOfferItemID(ctx context.Context, req *offer_item.GetAssigneeByAmebaIDOfferItemIDRequest) (*offer_item.GetAssigneeByAmebaIDOfferItemIDResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	amebaID := model.AmebaID(req.GetAmebaId())
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	assignee, err := h.assigneeUsecase.GetAssigneeByAmebaIDOfferItemID(ctx, amebaID, offerItemID)
+	if err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.GetAssignee: %w", err)
+	}
+
+	return &offer_item.GetAssigneeByAmebaIDOfferItemIDResponse{
+		Request:  req,
+		Assignee: converter.AssigneeModelToPB(assignee),
+	}, nil
+}
+
+func (h *offerItemHandler) FinishedShipment(ctx context.Context, req *offer_item.FinishedShipmentRequest) (*offer_item.FinishedShipmentResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	if err := h.assigneeUsecase.FinishedShipment(ctx, offerItemID); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.FinishedShipment: %w", err)
+	}
+
+	return &offer_item.FinishedShipmentResponse{
+		Request: req,
+	}, nil
+}
+
+func (h *offerItemHandler) CompletedOfferItem(ctx context.Context, req *offer_item.CompletedOfferItemRequest) (*offer_item.CompletedOfferItemResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+
+	if err := h.assigneeUsecase.CompletedOfferItem(ctx, offerItemID); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.CompletedOfferItem: %w", err)
+	}
+
+	return &offer_item.CompletedOfferItemResponse{
+		Request: req,
+	}, nil
+}
+
+func (h *offerItemHandler) PaymentCompleted(ctx context.Context, req *offer_item.PaymentCompletedRequest) (*offer_item.PaymentCompletedResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, apperr.OfferItemValidationError.Wrap(err)
+	}
+
+	// モデルに変換する
+	offerItemID := model.OfferItemID(req.GetOfferItemId())
+	amebaIDs := make([]model.AmebaID, 0, len(req.GetAmebaIds()))
+	for _, amebaID := range req.GetAmebaIds() {
+		amebaIDs = append(amebaIDs, model.AmebaID(amebaID))
+	}
+
+	if err := h.assigneeUsecase.PaymentCompleted(ctx, offerItemID, amebaIDs); err != nil {
+		return nil, fmt.Errorf("h.offerItemUsecase.PaymentCompleted: %w", err)
+	}
+
+	return &offer_item.PaymentCompletedResponse{
+		Request: req,
+	}, nil
+}
+
 func (h *offerItemHandler) HealthCheck(ctx context.Context, req *offer_item.HealthCheckReq) (*offer_item.HealthCheckRes, error) {
 	fmt.Print("============HealthCheck===============")
 	// TODO: HealthCheckの実装を追加
